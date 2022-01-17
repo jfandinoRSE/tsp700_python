@@ -23,23 +23,58 @@ from jinja2 import Template
 from linemode import open_printer
 from linemode.renderers import xml
 
-printer = open_printer('USB\VID_0483&PID_5720\11101800002')
+import sqlite3
+import pandas as pd
 
-# jinja2 template
-template = """
-<document>
-  <line>
-    MARICO EL QUE LO LEA
-  </line>
-</document>
-"""
-# line mode printer document
-document = Template(template).render()
 
-# iterator of generic printer instructions
-commands = xml.render(document)
+class PrintCola:
+    con = sqlite3.connect('coladata.db')
+    _instance = None
 
-# printer specific compiled representation
-program = printer.compile(commands)
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(PrintCola, cls).__new__(cls)
+            cls._instance._load_config()
 
-printer.execute(program)
+        return cls._instance
+
+    def _load_config(self):
+        pass
+
+    def sql_table(con, entities):
+        df = pd.read_sql_query("SELECT * from coladata", con)
+
+        if len(df) is None:
+            cursorObj = con.cursor()
+
+            cursorObj.execute(
+                'INSERT INTO employees(id, name, salary, department, position, hireDate) VALUES(?, ?, ?, ?, ?, ?)',
+                entities)
+
+            con.commit()
+
+    entities = (2, 'Andrew', 800, 'IT', 'Tech', '2018-02-06')
+
+    sql_table(con, entities)
+
+    def print(self,data):
+        printer = open_printer('/dev/usb/lp0')
+        #jinja2 template
+        template = """
+        <document>
+          <line>
+          {{data}}
+          Prueba de impresión 
+          </line>
+        </document>
+        """
+        # line mode printer document
+        document = Template(template).render()
+
+        # iterator of generic printer instructions
+        commands = xml.render(document)
+
+        # printer specific compiled representation
+        program = printer.compile(commands)
+
+        printer.execute(program)
