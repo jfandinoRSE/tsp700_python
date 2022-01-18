@@ -1,22 +1,3 @@
-"""from escpos.constants import GS, _CUT_PAPER, PAPER_FULL_CUT
-from escpos.printer import Usb
-import six
-
-
-
-p = Usb(0x0519, 0x0001)
-#p.text("Hello World OLA QU\n")
-#p._raw(chr(29)+chr(86)+chr(00)+chr(48))
-#print(chr(29)+chr(86)+chr(00)+chr(48))
-#p.write(b'\x1D'+b'\x56')
-#p._raw(GS + b'V' + six.int2byte(66) + b'\x00')
-#PAPER_FULL_CUT
-#CUT_PAPER = lambda m: GS + b'V' + b'\x00'
-p.cut('PART')
-print('\x1d'+'\x56'+'\x00')
-#print(chr())
-"""
-
 
 from jinja2 import Template
 
@@ -24,102 +5,110 @@ from linemode import open_printer
 from linemode.renderers import xml
 
 import sqlite3
-import pandas as pd
 
 
-
-class PrintCola:
-    con = sqlite3.connect('coladata.db')
-    _instance = None
-    pchek = False
+def sql_check_tail(con):
     try:
-        df = pd.read_sql_query("SELECT * from employees", con)
-        if df > 1:
+        sql = 'SELECT * FROM venta'
+        cursor = con.cursor()
+        cursor.execute(sql)
+        df = len(cursor.fetchall())
+        if df >= 1:
             i = df
         else:
             i = 0
+        return i, df
     except:
         i = 0
-        pass
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(PrintCola, cls).__new__(cls)
-            cls._instance._load_config()
-
-        return cls._instance
-
-    def _load_config(self):
-        pass
-
-    def sql_table(con, entities, i):
-        try:
-            df = pd.read_sql_query("SELECT * from employees", con)
-        except:
-
-            cursorObj = con.cursor()
-            cursorObj.execute(
-                "CREATE TABLE employees(id integer PRIMARY KEY, name text, salary real, department text, position text, hireDate text)")
-            con.commit()
-            df = pd.read_sql_query("SELECT * from employees", con)
+        df = 0
+        return i, df
 
 
+def sql_table(con, entities):
+    try:
+        sql = 'SELECT * FROM venta'
+        cursor = con.cursor()
+        cursor.execute(sql)
+        df = len(cursor.fetchall())
+    except:
         cursorObj = con.cursor()
-        i =+ 1
         cursorObj.execute(
-            'INSERT INTO employees(id, name, salary, department, position, hireDate) VALUES(?, ?, ?, ?, ?, ?)',
-            entities)
-
+            "CREATE TABLE venta(id integer PRIMARY KEY, name text, salary real, department text, position text,"
+            " hireDate text)")
         con.commit()
-        return i
 
-    entities = (i+1, 'Andrew', 800, 'IT', 'Tech', '2018-02-06')
+    cursorObj = con.cursor()
 
-    i = sql_table(con, entities, i)
-    print(str(i))
-    def sql_print(con, pcheck, i):
-        cursorObj = con.cursor()
+    cursorObj.execute(
+        'INSERT INTO venta(id, name, salary, department, position, hireDate) VALUES(?, ?, ?, ?, ?, ?)',
+        entities)
 
-        cursorObj.execute('SELECT * FROM employees WHERE id==?', str(i))
+    con.commit()
 
-        rows = cursorObj.fetchall()
-        try:
-            for row in rows:
-                print(row)
-            pcheck=True
-        except:
-            pcheck=False
+
+def sql_print(con, pcheck):
+    cursorObj = con.cursor()
+
+    cursorObj.execute('SELECT * FROM venta ORDER BY ROWID ASC LIMIT 1')
+
+    rows = cursorObj.fetchall()
+    try:
+        for row in rows:
+            print(row)
+        printer = open_printer('star+lpt:///dev/usb/lp2')
+        # jinja2 template
+        template = """
+        <document>
+        <line>
+            Datos de comprador
+        </line>
+            <line>
+            {{rows}}
+            </line>
+        </document>
+        """
+        # line mode printer document
+        document = Template(template).render(rows=str(rows))
+
+        # iterator of generic printer instructions
+        commands = xml.render(document)
+
+        # printer specific compiled representation
+        program = printer.compile(commands)
+
+        printer.execute(program)
+
+        pcheck = True
         return pcheck
-#        printer = open_printer('/dev/usb/lp0')
-#        #jinja2 template
-#        template = """
-#        <document>
-#          <line>
-#          {{data}}
-#          Prueba de impresión
-#          </line>
-#        </document>
-#        """
-#        # line mode printer document
-#        document = Template(template).render()
-
-#        # iterator of generic printer instructions
-#        commands = xml.render(document)
-
-#        # printer specific compiled representation
- #       program = printer.compile(commands)
-
-#        printer.execute(program)
-    def sql_delete(con, i):
-        cursorObj = con.cursor()
-
-        cursorObj.execute('DELETE FROM employees WHERE id == ?', str(i))
-
-        con.commit()
-        return i-1
+    except:
+        pcheck = False
+        return pcheck
 
 
-    while pchek==False:
-        pchek=sql_print(con, pchek, i)
-    i=sql_delete(con, i)
+def sql_delete(con):
+    cursorObj = con.cursor()
+    cursorObj.execute('DELETE FROM venta ORDER BY ROWID ASC LIMIT 1')
 
+    con.commit()
+
+
+def main_tail():
+    con = sqlite3.connect('coladata.db')
+    i, df = sql_check_tail(con)
+    if df != 1:
+        i = + 1
+    entities = (i, 'Andree', 800, 'IT', 'Tech', '2018-02-06')
+    sql_table(con, entities)
+    return i, con
+
+
+def main_print():
+    pchek = False
+    i, con = main_tail()
+    while not pchek:
+        pchek = sql_print(con, pchek)
+    sql_delete(con)
+
+if __name__ == '__main__':
+    main_print()
 

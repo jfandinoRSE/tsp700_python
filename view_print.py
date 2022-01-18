@@ -1,4 +1,2 @@
-from TSP700printer import PrintCola
+from TSP700printer import main_print
 
-if __name__ == '__main__':
-    PrintCola
