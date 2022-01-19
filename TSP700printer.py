@@ -1,3 +1,4 @@
+from datetime import datetime
 
 from jinja2 import Template
 
@@ -40,10 +41,21 @@ def sql_table(con, entities):
     cursorObj = con.cursor()
 
     cursorObj.execute(
-        'INSERT INTO venta(id, name, salary, department, position, hireDate) VALUES(?, ?, ?, ?, ?, ?)',
+        'INSERT INTO venta(id, name, last_name, amount, date_sell, box_office, sell_type, station, carrier_name )'
+        ' VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)',
         entities)
 
     con.commit()
+
+
+def main_tail():
+    con = sqlite3.connect('coladata.db')
+    i, df = sql_check_tail(con)
+    if df != 1:
+        i = + 1
+    entities = (i, 'Andree', 'perez', '10', 'Taquilla 2', datetime.now, 'debito', 'miranda', 'evelio')
+    sql_table(con, entities)
+    return i, con
 
 
 def sql_print(con, pcheck):
@@ -53,8 +65,7 @@ def sql_print(con, pcheck):
 
     rows = cursorObj.fetchall()
     try:
-        for row in rows:
-            print(row)
+        # configurate port USB before use the printer
         printer = open_printer('star+lpt:///dev/usb/lp2')
         # jinja2 template
         template = """
@@ -92,23 +103,33 @@ def sql_delete(con):
     con.commit()
 
 
-def main_tail():
-    con = sqlite3.connect('coladata.db')
-    i, df = sql_check_tail(con)
-    if df != 1:
-        i = + 1
-    entities = (i, 'Andree', 800, 'IT', 'Tech', '2018-02-06')
-    sql_table(con, entities)
-    return i, con
-
-
 def main_print():
     pchek = False
-    i, con = main_tail()
-    while not pchek:
-        pchek = sql_print(con, pchek)
-    sql_delete(con)
+    con = sqlite3.connect('coladata.db')
+    try:
+        while not pchek:
+            pchek = sql_print(con, pchek)
+        sql_delete(con)
 
-if __name__ == '__main__':
-    main_print()
+        if pchek:
+            success = True
+        return success
+    except:
+        success = False
+        return success
+
+
+def inf_client(data):
+    if len(data) == 9:
+        di1 = dict(Nombre=str(data[1]),
+                   Apellido=str(data[2]),
+                   Monto=str(data[3]),
+                   Fecha=str(data[4]),
+                   Taquilla=str(data[5]),
+                   Tipo_de_venta=str(data[6]),
+                   Estación=str(data[7]),
+                   Operador=str(data[8])
+                   )
+    return di1
+
 
